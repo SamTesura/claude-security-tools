@@ -1,0 +1,54 @@
+services:
+  mcp-security:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-security-server
+    
+    user: "0:0"
+    
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+      - SYS_ADMIN
+      - SYS_PTRACE
+    
+    environment:
+      - SCAN_DB_PATH=/data/scans.db
+      - RESULTS_PATH=/data/results
+      - WPSCAN_API_TOKEN=${WPSCAN_API_TOKEN:-}
+    
+    volumes:
+      - ./data:/data
+      - ./wordlists:/usr/share/wordlists/custom:ro
+    
+    network_mode: host
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    stdin_open: true
+    tty: true
+    
+    privileged: true
+    
+    command: tail -f /dev/null
+
+volumes:
+  data:
+    driver: local
