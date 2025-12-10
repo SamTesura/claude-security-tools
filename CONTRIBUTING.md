@@ -42,7 +42,7 @@ Thank you for your interest in contributing to Claude Security Tools! This docum
 
 ```bash
 # Clone your fork
-git clone https://github.com/samtesura/claude-security-tools.git
+git clone https://github.com/your-username/claude-security-tools.git
 cd claude-security-tools
 
 # Create feature branch
