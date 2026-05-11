@@ -1,0 +1,18 @@
+{
+  "_comment": "Scope allowlist for MCP security-testing server. Set MCP_SCOPE_FILE=/path/to/scope.json in the container env to enforce. Any target/URL not matched by these lists is rejected before the underlying tool runs.",
+  "cidrs": [
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16"
+  ],
+  "hosts": [
+    "localhost",
+    "lab.example.com",
+    "testphp.vulnweb.com"
+  ],
+  "url_patterns": [
+    "^https?://localhost(:[0-9]+)?(/.*)?$",
+    "^https?://testphp\\.vulnweb\\.com(/.*)?$"
+  ]
+}

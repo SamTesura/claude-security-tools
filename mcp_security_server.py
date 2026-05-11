@@ -10,9 +10,12 @@ import re
 import json
 import sqlite3
 import os
+import sys
+import ipaddress
 from datetime import datetime
 from typing import Optional, Dict, List
 from pathlib import Path
+from urllib.parse import urlparse
 from mcp.server.fastmcp import FastMCP
 
 # Initialize FastMCP server
@@ -21,6 +24,79 @@ mcp = FastMCP("security-testing")
 # Configuration
 DB_PATH = os.getenv("SCAN_DB_PATH", "/data/scans.db")
 RESULTS_PATH = os.getenv("RESULTS_PATH", "/data/results")
+SCOPE_FILE = os.getenv("MCP_SCOPE_FILE")
+
+# Scope enforcement. If MCP_SCOPE_FILE is set, the server fails closed for any
+# target outside the listed CIDRs / hosts / URL patterns. If unset, the server
+# runs in audit mode (allow-all + startup warning) for backwards compatibility.
+_SCOPE: Dict = {"mode": "audit"}
+
+def _load_scope():
+    global _SCOPE
+    if not SCOPE_FILE:
+        print(
+            "[security-mcp] WARNING: MCP_SCOPE_FILE unset — running in AUDIT mode "
+            "(all targets allowed). Set MCP_SCOPE_FILE=/path/to/scope.json to enforce.",
+            file=sys.stderr,
+        )
+        return
+    if not os.path.exists(SCOPE_FILE):
+        raise RuntimeError(f"MCP_SCOPE_FILE set but file not found: {SCOPE_FILE}")
+    with open(SCOPE_FILE) as f:
+        data = json.load(f)
+    _SCOPE = {
+        "mode": "enforce",
+        "cidrs": [ipaddress.ip_network(c, strict=False) for c in data.get("cidrs", [])],
+        "hosts": set(data.get("hosts", [])),
+        "url_patterns": [re.compile(p) for p in data.get("url_patterns", [])],
+    }
+    print(
+        f"[security-mcp] scope ENFORCED from {SCOPE_FILE}: "
+        f"{len(_SCOPE['cidrs'])} CIDRs, {len(_SCOPE['hosts'])} hosts, "
+        f"{len(_SCOPE['url_patterns'])} URL patterns",
+        file=sys.stderr,
+    )
+
+_load_scope()
+
+def enforce_scope_target(target: str) -> None:
+    """Reject IP/hostname targets outside scope."""
+    if _SCOPE["mode"] == "audit":
+        return
+    if target in _SCOPE["hosts"]:
+        return
+    try:
+        ip = ipaddress.ip_address(target)
+        for net in _SCOPE["cidrs"]:
+            if ip in net:
+                return
+    except ValueError:
+        pass  # target is a hostname, not a literal IP
+    raise PermissionError(
+        f"Target {target!r} not in scope. Add it to MCP_SCOPE_FILE."
+    )
+
+def enforce_scope_url(url: str) -> None:
+    """Reject URLs whose host or pattern is outside scope."""
+    if _SCOPE["mode"] == "audit":
+        return
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    if host in _SCOPE["hosts"]:
+        return
+    try:
+        ip = ipaddress.ip_address(host)
+        for net in _SCOPE["cidrs"]:
+            if ip in net:
+                return
+    except ValueError:
+        pass
+    for pat in _SCOPE["url_patterns"]:
+        if pat.match(url):
+            return
+    raise PermissionError(
+        f"URL {url!r} not in scope. Add its host or a URL pattern to MCP_SCOPE_FILE."
+    )
 
 # Initialize database and results directory
 def init_storage():
@@ -161,8 +237,9 @@ def nmap_basic(target: str, ports: str = "1-1000") -> str:
         Formatted scan results with raw output and parsed data
     """
     target = sanitize_target(target)
+    enforce_scope_target(target)
     ports = sanitize_input(ports)
-    
+
     cmd = ["nmap", "-sS", "-T2", "-p", ports, target]
     result = run_command(cmd, timeout=600)
     
@@ -213,8 +290,9 @@ def nmap_advanced(
         Comprehensive scan results
     """
     target = sanitize_target(target)
+    enforce_scope_target(target)
     ports = sanitize_input(ports)
-    
+
     cmd = ["nmap", f"-{scan_type}", f"-T{timing}", "-p", ports]
     
     if service_detection:
@@ -306,6 +384,7 @@ def nikto_scan(target: str, port: int = 80, ssl: bool = False, tuning: Optional[
         tuning: Nikto -Tuning string (e.g. "x6" = all minus dos)
     """
     target = sanitize_target(target)
+    enforce_scope_target(target)
     if not (1 <= port <= 65535):
         raise ValueError("port must be 1-65535")
     cmd = ["nikto", "-h", target, "-p", str(port), "-ask", "no"]
@@ -347,6 +426,7 @@ def sqlmap_scan(
         tables: Database name to enumerate tables for
     """
     url = sanitize_url(url)
+    enforce_scope_url(url)
     if not (1 <= level <= 5):
         raise ValueError("level must be 1-5")
     if not (1 <= risk <= 3):
@@ -385,6 +465,7 @@ def wpscan_scan(url: str, enumerate: str = "vp,vt,u1-10", api_token: Optional[st
         api_token: WPVulnDB token (else WPSCAN_API_TOKEN env)
     """
     url = sanitize_url(url)
+    enforce_scope_url(url)
     if not re.fullmatch(r'[a-zA-Z0-9,\-]+', enumerate):
         raise ValueError("enumerate must be alnum+comma+dash")
     cmd = ["wpscan", "--url", url, "--enumerate", enumerate,
@@ -413,6 +494,7 @@ def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", 
         extensions: csv extensions to append (e.g. "php,html,bak")
     """
     url = sanitize_url(url)
+    enforce_scope_url(url)
     wordlist = sanitize_path(wordlist)
     cmd = ["dirb", url, wordlist, "-S", "-r"]
     if extensions:
@@ -474,6 +556,7 @@ def hydra_bruteforce(
         stop_on_success: Exit on first valid credential
     """
     target = sanitize_target(target)
+    enforce_scope_target(target)
     if not re.fullmatch(r'[a-z0-9\-]+', service):
         raise ValueError("service must be lowercase alnum+dash")
     userlist = sanitize_path(userlist)
@@ -550,10 +633,15 @@ def msfconsole_run(module: str, options: Dict[str, str], action: str = "run") ->
         options: Dict of option name → value
         action: 'run', 'check', or 'exploit'
     """
-    if not re.fullmatch(r'[a-zA-Z0-9_/\-]+', module):
-        raise ValueError("module must be alnum + _/-/slash")
-    if action not in ("run", "check", "exploit"):
-        raise ValueError("action must be run|check|exploit")
+    # Hard restriction: only auxiliary/* and post/* modules are reachable via MCP.
+    # exploit/* launches must stay in human-driven msfconsole.
+    if not re.fullmatch(r'(auxiliary|post)/[a-zA-Z0-9_/\-]+', module):
+        raise ValueError(
+            "Only auxiliary/* and post/* modules are allowed via MCP. "
+            "exploit/* requires a human in the loop."
+        )
+    if action not in ("run", "check"):
+        raise ValueError("action must be run|check (exploit is blocked by module restriction)")
     rc_lines = [f"use {module}"]
     for k, v in options.items():
         if not re.fullmatch(r'[A-Za-z0-9_]+', k):
@@ -563,6 +651,12 @@ def msfconsole_run(module: str, options: Dict[str, str], action: str = "run") ->
             raise ValueError("option values cannot contain newlines")
         if re.search(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', sval):
             raise ValueError(f"option value contains control chars: {k}")
+        # If the option is a host target, enforce scope on it.
+        if k.upper() in ("RHOSTS", "RHOST"):
+            for tok in re.split(r'[,\s]+', sval):
+                tok = tok.strip()
+                if tok:
+                    enforce_scope_target(tok)
         rc_lines.append(f"set {k} {sval}")
     rc_lines += [action, "exit"]
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
