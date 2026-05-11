@@ -67,3 +67,38 @@ logs/
 # Backup files
 *.bak
 *.backup
+
+# Pentest tool sessions
+.msf4/
+.sqlmap/
+.recon-ng/
+.john/
+.hydra/
+
+# Scan output dirs
+loot/
+output/
+scans/
+reports/
+
+# Captures
+*.pcap
+*.cap
+*.hccapx
+*.dump
+
+# Hash/cred files
+*.hash
+*.potfile
+*.kdbx
+credentials*
+secrets*
+creds*
+
+# Keys/certs
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*.crt
+*.pfx
