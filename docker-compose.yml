@@ -18,10 +18,16 @@ services:
       - SCAN_DB_PATH=/data/scans.db
       - RESULTS_PATH=/data/results
       - WPSCAN_API_TOKEN=${WPSCAN_API_TOKEN:-}
-    
+      - MCP_SCOPE_FILE=/etc/mcp/scope.json
+
     volumes:
       - ./data:/data
       - ./wordlists:/usr/share/wordlists/custom:ro
+      # Scope allowlist. Host path overridable via MCP_SCOPE_HOST_FILE env;
+      # defaults to the repo's scope.example.json so the stack still builds
+      # without the secret. Set MCP_SCOPE_HOST_FILE in a local .env to use
+      # your real out-of-tree scope file.
+      - ${MCP_SCOPE_HOST_FILE:-./scope.example.json}:/etc/mcp/scope.json:ro
     
     network_mode: host
     
