@@ -2,6 +2,9 @@
 data/
 wordlists/
 
+# Graphify knowledge-graph output (generated, re-buildable via `graphify .`)
+graphify-out/
+
 # Environment files
 .env
 *.env
