@@ -1,14 +1,10 @@
 {
-  "_comment": "Scope allowlist for MCP security-testing server. Set MCP_SCOPE_FILE=/path/to/scope.json in the container env to enforce. Any target/URL not matched by these lists is rejected before the underlying tool runs.",
+  "_comment": "MINIMAL PLACEHOLDER SCOPE. Any target/URL not matched here is rejected before the tool runs. This ships intentionally tight (loopback + the public Acunetix test site only). ADD ONLY networks/hosts you are AUTHORIZED to test — e.g. your lab CIDR (192.168.x.0/24). Do NOT re-add whole RFC1918 ranges unless you truly own them. Point MCP_SCOPE_HOST_FILE at an out-of-tree file for your real engagement scope.",
   "cidrs": [
-    "127.0.0.0/8",
-    "10.0.0.0/8",
-    "172.16.0.0/12",
-    "192.168.0.0/16"
+    "127.0.0.0/8"
   ],
   "hosts": [
     "localhost",
-    "lab.example.com",
     "testphp.vulnweb.com"
   ],
   "url_patterns": [

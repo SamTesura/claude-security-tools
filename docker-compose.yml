@@ -4,16 +4,18 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mcp-security-server
-    
+
     user: "0:0"
-    
+
+    # Least-privilege capability set. nmap SYN/UDP/OS scans need only CAP_NET_RAW;
+    # nothing in the toolchain needs SYS_ADMIN/SYS_PTRACE/NET_ADMIN/NET_BIND_SERVICE.
+    cap_drop:
+      - ALL
     cap_add:
       - NET_RAW
-      - NET_ADMIN
-      - NET_BIND_SERVICE
-      - SYS_ADMIN
-      - SYS_PTRACE
-    
+    security_opt:
+      - no-new-privileges:true
+
     environment:
       - SCAN_DB_PATH=/data/scans.db
       - RESULTS_PATH=/data/results
@@ -29,8 +31,12 @@ services:
       # your real out-of-tree scope file.
       - ${MCP_SCOPE_HOST_FILE:-./scope.example.json}:/etc/mcp/scope.json:ro
     
+    # Host networking is an intentional choice for a pentest box (LAN scanning,
+    # source-IP fidelity, reverse-shell catchers). It also exposes host loopback
+    # services to the container — acceptable given the container is operator-run
+    # and no longer privileged. Switch to a bridge network if you don't need it.
     network_mode: host
-    
+
     deploy:
       resources:
         limits:
@@ -41,18 +47,15 @@ services:
           memory: 2G
     
     restart: unless-stopped
-    
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    
+
+    # No healthcheck: the MCP server is a stdio process launched on demand via
+    # `docker exec`, not a persistent listener, so there is nothing meaningful to
+    # probe. A "python3 exit 0" check only ever reports green and hides a wedged
+    # server. The container's job here is just to stay alive for exec.
+
     stdin_open: true
     tty: true
-    
-    privileged: true
-    
+
     command: tail -f /dev/null
 
 volumes:
