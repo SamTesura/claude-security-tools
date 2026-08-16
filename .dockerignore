@@ -1,0 +1,15 @@
+# Keep the build context small — the image only needs mcp_security_server.py.
+.git
+.gitignore
+data/
+wordlists/
+graphify-out/
+docs/
+*.md
+.env
+.env.template
+__pycache__/
+*.pyc
+*.pyo
+scope.example.json
+setup.sh
