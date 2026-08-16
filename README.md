@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-WSL%202-blue.svg)](https://docs.microsoft.com/en-us/windows/wsl/)
 [![Kali Linux](https://img.shields.io/badge/OS-Kali%20Linux-557C94.svg)](https://www.kali.org/)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](#whats-new-in-v110)
 
 > Run professional security testing tools (Nmap, Nikto, SQLmap, WPScan, and more) directly through Claude AI using MCP (Model Context Protocol) on Windows 11 + WSL 2 + Kali Linux.
 
@@ -17,6 +18,21 @@ This project provides a fully-configured MCP server that integrates professional
 ### What is MCP?
 
 Model Context Protocol (MCP) allows Claude to interact with external tools and systems. This server wraps security testing tools in an MCP interface, giving Claude the ability to run real pentesting commands on your behalf.
+
+---
+
+## What's New in v1.1.0
+
+Security-hardening release. Highlights:
+
+- **Fail-closed scope** — the server refuses to start without a scope allowlist unless `MCP_SCOPE_MODE=audit` is explicitly set; targets/URLs outside `MCP_SCOPE_FILE` are rejected before any tool runs (CIDR/range containment, fully-anchored URL matching).
+- **Argument-injection hardening** — every tool builds a strict `argv` (never a shell); `nmap` scan-type/timing are allow-listed and leading-dash tokens are rejected, closing an `nmap --script=…` code-execution vector.
+- **Secret redaction** — WPScan API tokens and URL credentials are redacted before scans are written to the SQLite history.
+- **Restrictive artifacts** — results directory `0700`; hash files, Metasploit RC files and the scan DB `0600`; unique, collision-free filenames.
+- **Least-privilege container** — no `privileged`; `cap_drop: ALL` + `cap_add: NET_RAW` + `no-new-privileges` (nmap's redundant file capabilities are stripped so SYN scans still work as root).
+- **Reliability** — bounded, lenient-decoded tool output; per-process-group timeout cleanup; blocking scans offloaded so the server stays responsive.
+
+See [Security Features](#-security--legal) below for details.
 
 ---
 
@@ -38,10 +54,10 @@ Model Context Protocol (MCP) allows Claude to interact with external tools and s
 
 ✅ **Basic & Advanced Modes** - Simple defaults for quick scans, full control for experts  
 ✅ **Stealth Scanning** - Low-noise, IDS-evasion techniques  
-✅ **Result Persistence** - SQLite database + file storage  
-✅ **Safety Confirmations** - Destructive tools require explicit confirmation  
-✅ **Input Sanitization** - Protection against command injection  
-✅ **Full Privileges** - Root access for all scan types  
+✅ **Result Persistence** - SQLite database + file storage (secrets redacted, `0600` artifacts)  
+✅ **Fail-Closed Scope** - Targets outside your allowlist are rejected before any tool runs  
+✅ **Input Sanitization** - Strict argv construction, no attacker-controlled flags  
+✅ **Least-Privilege Container** - No `privileged`, drops all caps except `NET_RAW`  
 ✅ **Formatted Output** - Raw output + parsed structured data
 
 ---
@@ -231,10 +247,13 @@ You must:
 
 ### 🛡️ Security Features
 
-- **Input Sanitization** - All inputs validated to prevent command injection
-- **Confirmation Required** - Destructive tools (SQLmap, Hydra) require explicit confirmation
-- **Isolated Container** - Tools run in Docker container with controlled privileges
-- **Audit Trail** - All scans logged to SQLite database
+- **Fail-Closed Scope Enforcement** - Every target/URL is checked against a JSON allowlist (`MCP_SCOPE_FILE`) before a tool runs. With no scope file the server refuses to start unless you explicitly set `MCP_SCOPE_MODE=audit`. CIDRs and ranges are matched by containment.
+- **Argument-Injection Hardening** - All inputs are built into `argv` lists (never a shell); leading-dash tokens are rejected and `nmap` scan/timing flags are allowlisted, so a target/param can't smuggle a `--script`/`-oN` flag.
+- **Secret Redaction** - The WPScan API token and URL credentials are redacted before scan commands are written to `scans.db`.
+- **Restrictive Artifacts** - Results dir is `0700`; hash files, Metasploit RC files, and `scans.db` are `0600`.
+- **Least-Privilege Container** - Runs without `privileged`, `cap_drop: ALL` + `cap_add: NET_RAW`, `no-new-privileges`.
+- **Bounded & Responsive** - Output is capped, subprocesses run in their own process group (killed cleanly on timeout), and blocking scans are offloaded so the server stays responsive.
+- **Audit Trail** - All scans logged to SQLite database.
 
 ---
 
