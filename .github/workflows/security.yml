@@ -1,0 +1,37 @@
+name: security
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    - cron: '20 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A secret that was committed and later removed is still burned.
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          VERSION=8.28.0
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+
+      - name: Secret scan (full history)
+        run: gitleaks git . --redact --no-banner --report-format json --report-path gitleaks.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Dependency audit
+        run: |
+          pip install pip-audit
+          if [ -f requirements.txt ]; then pip-audit -r requirements.txt --strict; else pip-audit --strict || true; fi
