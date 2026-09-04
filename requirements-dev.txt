@@ -1,0 +1,5 @@
+pytest
+pytest-cov
+radon
+ruff
+mcp<2

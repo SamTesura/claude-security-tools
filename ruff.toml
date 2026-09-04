@@ -1,0 +1,5 @@
+# Quality-gate lint config. Selects real-bug rules (pyflakes + syntax), not
+# stylistic opinions, so the gate flags genuine defects without demanding a
+# reformat of the whole tree.
+[lint]
+select = ["F", "E9"]

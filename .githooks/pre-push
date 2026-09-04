@@ -1,0 +1,13 @@
+#!/bin/sh
+# Quality gates — installed by the Python gate kit.
+# Bypass in a genuine emergency with: git push --no-verify
+# (CI runs the same gates on the PR, so a bypass here does not get it merged.)
+
+PY="$(command -v python3 || command -v python)"
+
+if [ -z "$PY" ]; then
+  echo "quality gates: python not found on PATH — skipping local gates (CI will still run them)"
+  exit 0
+fi
+
+exec "$PY" .quality-gates/run_gates.py

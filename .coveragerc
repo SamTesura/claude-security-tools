@@ -1,0 +1,22 @@
+[run]
+# `source` set to the repo root so coverage.py reports EVERY module under it —
+# including files no test ever imports. Without this a brand-new untested file
+# would simply be absent from the report, and dead untested code could raise
+# the average and sail through the gate.
+source = .
+branch = True
+
+omit =
+    .quality-gates/*
+    tests/*
+    test_*.py
+    */test_*.py
+    */__pycache__/*
+    */site-packages/*
+    */.venv/*
+    */venv/*
+    setup.py
+    conftest.py
+
+[report]
+show_missing = True
