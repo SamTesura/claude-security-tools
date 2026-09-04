@@ -152,8 +152,20 @@ def main():
         }
 
     baseline = config.get("baseline")
+    # CI throws its working tree away, so a baseline recorded there never
+    # persists. Quietly re-recording each run would make the ratchets a no-op.
+    in_ci = bool(os.environ.get("CI"))
+
     if measured:
-        if not baseline or FORCE_RECORD:
+        if not baseline and in_ci and not FORCE_RECORD:
+            msg = ("no committed baseline — the coverage, CRAP and complexity ratchets are "
+                   "INACTIVE. Run `python .quality-gates/run_gates.py --record` locally and "
+                   "commit gates.config.json.")
+            if blocking:
+                fail("baseline", msg)
+            else:
+                notes.append("\u26a0 " + msg)
+        elif not baseline or FORCE_RECORD:
             config["baseline"] = {**measured, "recordedAt": date.today().isoformat()}
             save_config(config)
             baseline = config["baseline"]
