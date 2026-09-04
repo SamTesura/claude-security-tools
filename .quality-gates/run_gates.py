@@ -17,6 +17,7 @@ gates were installed.
 
 import json
 import os
+import pathlib
 import subprocess
 import sys
 from datetime import date, datetime, timezone
@@ -104,7 +105,16 @@ def main():
     # --------------------------------------------------- tests + coverage
     analysis = None
     want_coverage = gates.get("coverage") is not False
-    if gates.get("test") is not False:
+    have_pytest = subprocess.run(
+        [py, "-m", "pytest", "--version"],
+        cwd=ROOT, capture_output=True,
+    ).returncode == 0
+    if gates.get("test") is not False and not have_pytest:
+        # Not installed is an environment gap, not a code defect. CI installs
+        # requirements-dev.txt and enforces this gate for real.
+        notes.append("tests: pytest not installed — run `pip install -r requirements-dev.txt`. "
+                     "CI still enforces this gate.")
+    elif gates.get("test") is not False:
         cov_source = config.get("coverageSource", ".")
         cmd = [py, "-m", "pytest"]
         if want_coverage:
@@ -125,7 +135,11 @@ def main():
             cov_xml = os.path.join(ROOT, "coverage.xml")
             analysis = analyze_coverage(cov_xml, root=ROOT)
             if not analysis:
-                notes.append("coverage: no coverage.xml produced — CRAP gate skipped")
+                from crap import cc_visit as _cc
+                if _cc is None:
+                    notes.append("coverage: radon not installed — run `pip install -r requirements-dev.txt`. CI still enforces this gate.")
+                else:
+                    notes.append("coverage: no coverage.xml produced — CRAP gate skipped")
 
     # -------------------------------------------------- ratchet comparisons
     measured = None
@@ -208,5 +222,27 @@ def main():
     return 1
 
 
+def _blocking_now():
+    """Read just enough config to decide whether a crash should reject the push."""
+    try:
+        import json
+        cfg = json.loads((pathlib.Path(__file__).parent / "gates.config.json").read_text())
+        ba = cfg.get("blockAfter")
+        return bool(ba) and date.today().isoformat() >= ba
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception:
+        import traceback
+        print("\nquality gates: the gate script itself failed —", file=sys.stderr)
+        traceback.print_exc()
+        # A broken gate must not silently block work during the warn ramp.
+        if _blocking_now():
+            print("\nPush rejected: gates are in blocking mode and could not run.", file=sys.stderr)
+            sys.exit(1)
+        print("\n\u26a0 warn mode — push allowed despite the gate failing to run.\n", file=sys.stderr)
+        sys.exit(0)

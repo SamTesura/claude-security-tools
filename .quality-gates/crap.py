@@ -86,8 +86,10 @@ def _coverage_in_range(line_map, start, end, def_line):
 
 def analyze_coverage(coverage_path, root=None):
     """Complexity + coverage for every function in a coverage.xml report."""
+    # A missing tool is an environment gap, not a code defect. Return None and
+    # let the caller report it as a skipped gate.
     if cc_visit is None:
-        raise RuntimeError("radon is not installed — cannot compute complexity")
+        return None
     if root is None:
         root = os.path.dirname(os.path.abspath(coverage_path)) or "."
 
