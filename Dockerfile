@@ -40,12 +40,23 @@ RUN mkdir -p /data/results
 # root+NET_RAW while we keep the no-new-privileges hardening.
 RUN setcap -r /usr/lib/nmap/nmap || true
 
+# Pin mcp to the v1 line. The server imports mcp.server.fastmcp.FastMCP, which
+# was removed in mcp 2.x — an unpinned install now pulls 2.x and the import
+# fails at startup ("No module named 'mcp.server.fastmcp'"). The standalone
+# fastmcp package was unused by this code, so it is dropped.
 RUN pip3 install --no-cache-dir --break-system-packages \
-    fastmcp \
-    mcp
+    "mcp<2"
 
 COPY mcp_security_server.py /root/mcp_security_server.py
 RUN chmod +x /root/mcp_security_server.py
+
+# Bake a valid default scope allowlist into the image. A single-file bind mount
+# of scope.json is unreliable on Docker Desktop + WSL2 (it can surface as an
+# empty file and trip the fail-closed scope loader at startup), so ship a valid
+# default in the image. Override by mounting a DIRECTORY that contains a
+# scope.json onto /etc/mcp (see docker-compose.yml).
+RUN mkdir -p /etc/mcp
+COPY scope.example.json /etc/mcp/scope.json
 
 # NOTE: msfdb init and `searchsploit -u` are intentionally NOT run at build time.
 # They introduce non-deterministic network fetches and DB state that does not
