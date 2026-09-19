@@ -1,4 +1,5 @@
-# Keep the build context small — the image only needs mcp_security_server.py.
+# Keep the build context small — the image needs mcp_security_server.py and
+# scope.example.json (baked in as the default scope allowlist).
 .git
 .gitignore
 data/
@@ -11,5 +12,4 @@ docs/
 __pycache__/
 *.pyc
 *.pyo
-scope.example.json
 setup.sh

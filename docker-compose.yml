@@ -13,6 +13,11 @@ services:
       - ALL
     cap_add:
       - NET_RAW
+      # Root also needs DAC_OVERRIDE to write the bind-mounted ./data dir, which
+      # is owned by the host user, not the container's root. Without it,
+      # cap_drop: ALL makes init_storage() fail with "unable to open database
+      # file" the first time it creates scans.db (notably on Docker Desktop/WSL).
+      - DAC_OVERRIDE
     security_opt:
       - no-new-privileges:true
 
@@ -25,11 +30,12 @@ services:
     volumes:
       - ./data:/data
       - ./wordlists:/usr/share/wordlists/custom:ro
-      # Scope allowlist. Host path overridable via MCP_SCOPE_HOST_FILE env;
-      # defaults to the repo's scope.example.json so the stack still builds
-      # without the secret. Set MCP_SCOPE_HOST_FILE in a local .env to use
-      # your real out-of-tree scope file.
-      - ${MCP_SCOPE_HOST_FILE:-./scope.example.json}:/etc/mcp/scope.json:ro
+      # The scope allowlist is baked into the image at /etc/mcp/scope.json (see
+      # the Dockerfile). Single-file bind mounts are unreliable on Docker
+      # Desktop + WSL2 — they can surface as an empty file — so scope.json is
+      # NOT mounted by default. To use a custom out-of-tree allowlist, mount a
+      # DIRECTORY that contains a scope.json onto /etc/mcp, e.g.:
+      #   - /home/you/engagements:/etc/mcp:ro
     
     # Host networking is an intentional choice for a pentest box (LAN scanning,
     # source-IP fidelity, reverse-shell catchers). It also exposes host loopback
