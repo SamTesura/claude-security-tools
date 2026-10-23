@@ -633,7 +633,8 @@ async def wpscan_scan(url: str, enumerate: str = "vp,vt,u1-10", api_token: Optio
         api_token: WPVulnDB token (else WPSCAN_API_TOKEN env)
         insecure_tls: skip certificate checks (--disable-tls-checks), for a lab target
             with a self-signed certificate. Off by default: the flag also covers
-            WPScan's own vulnerability-API calls, which carry the API token.
+            WPScan's own vulnerability-API calls, which carry the API token, so with
+            it the WPSCAN_API_TOKEN env token is not sent; pass api_token to send one.
     """
     url = sanitize_url(url)
     enforce_scope_url(url)
@@ -643,7 +644,7 @@ async def wpscan_scan(url: str, enumerate: str = "vp,vt,u1-10", api_token: Optio
            "--random-user-agent", "--no-banner"]
     if insecure_tls:
         cmd.append("--disable-tls-checks")
-    token = api_token or os.getenv("WPSCAN_API_TOKEN")
+    token = api_token or (None if insecure_tls else os.getenv("WPSCAN_API_TOKEN"))
     if token:
         if not re.fullmatch(r'[A-Za-z0-9]+', token):
             raise ValueError("api_token must be alphanumeric")
