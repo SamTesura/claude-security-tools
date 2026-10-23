@@ -198,7 +198,7 @@ print_step "Building Docker container..."
 print_warning "This will take 10-15 minutes. Time to grab a coffee! ☕"
 echo ""
 
-if docker-compose build; then
+if docker-compose build --pull; then
     print_success "Container built successfully"
 else
     print_error "Container build failed. Check the output above for errors."
