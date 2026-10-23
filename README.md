@@ -250,6 +250,7 @@ You must:
 - **Fail-Closed Scope Enforcement** - Every target/URL is checked against a JSON allowlist (`MCP_SCOPE_FILE`) before a tool runs. With no scope file the server refuses to start unless you explicitly set `MCP_SCOPE_MODE=audit`. CIDRs and ranges are matched by containment.
 - **Argument-Injection Hardening** - All inputs are built into `argv` lists (never a shell); leading-dash tokens are rejected and `nmap` scan/timing flags are allowlisted, so a target/param can't smuggle a `--script`/`-oN` flag.
 - **Secret Redaction** - The WPScan API token and URL credentials are redacted before scan commands are written to `scans.db`.
+- **WPScan Verifies TLS by Default** - WPScan checks certificates unless a scan passes `insecure_tls=true` for a self-signed lab target. That bypass also covers WPScan's own API calls, so with it the `WPSCAN_API_TOKEN` token is sent only if the scan passes `api_token` explicitly.
 - **Restrictive Artifacts** - Results dir is `0700`; hash files, Metasploit RC files, and `scans.db` are `0600`.
 - **Least-Privilege Container** - Runs without `privileged`, `cap_drop: ALL` + `cap_add: NET_RAW`, `no-new-privileges`.
 - **Bounded & Responsive** - Output is capped, subprocesses run in their own process group (killed cleanly on timeout), and blocking scans are offloaded so the server stays responsive.
