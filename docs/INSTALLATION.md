@@ -204,7 +204,7 @@ wsl --shutdown
 ```bash
 mkdir -p ~/.docker
 echo '{"credsStore": ""}' > ~/.docker/config.json
-docker-compose build --no-cache
+docker-compose build --pull --no-cache
 ```
 
 ### Claude Can't Connect
