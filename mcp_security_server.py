@@ -622,7 +622,8 @@ async def sqlmap_scan(
 
 # WPSCAN
 @mcp.tool()
-async def wpscan_scan(url: str, enumerate: str = "vp,vt,u1-10", api_token: Optional[str] = None) -> str:
+async def wpscan_scan(url: str, enumerate: str = "vp,vt,u1-10", api_token: Optional[str] = None,
+                      insecure_tls: bool = False) -> str:
     """
     WPScan WordPress vulnerability + enumeration.
 
@@ -630,13 +631,18 @@ async def wpscan_scan(url: str, enumerate: str = "vp,vt,u1-10", api_token: Optio
         url: WordPress site URL
         enumerate: csv WPScan enumerate flags (vp=vuln plugins, vt=vuln themes, u=users)
         api_token: WPVulnDB token (else WPSCAN_API_TOKEN env)
+        insecure_tls: skip certificate checks (--disable-tls-checks), for a lab target
+            with a self-signed certificate. Off by default: the flag also covers
+            WPScan's own vulnerability-API calls, which carry the API token.
     """
     url = sanitize_url(url)
     enforce_scope_url(url)
     if not re.fullmatch(r'[a-zA-Z0-9,\-]+', enumerate) or enumerate.startswith('-'):
         raise ValueError("enumerate must be alnum+comma+dash and not start with dash")
     cmd = ["wpscan", "--url", url, "--enumerate", enumerate,
-           "--random-user-agent", "--no-banner", "--disable-tls-checks"]
+           "--random-user-agent", "--no-banner"]
+    if insecure_tls:
+        cmd.append("--disable-tls-checks")
     token = api_token or os.getenv("WPSCAN_API_TOKEN")
     if token:
         if not re.fullmatch(r'[A-Za-z0-9]+', token):
